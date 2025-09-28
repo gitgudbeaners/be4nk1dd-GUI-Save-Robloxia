@@ -1,0 +1,176 @@
+-- ===== Load Rayfield =====
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+-- ===== Create Window =====
+local Window = Rayfield:CreateWindow({
+   Name = "be4nk1dd GUI | Save Robloxia",
+   Icon = 73558257073015,
+   LoadingTitle = "Loading",
+   LoadingSubtitle = "by be4nk1dd",
+   ShowText = "be4nk1dd GUI",
+   Theme = "Green",
+   ToggleUIKeybind = "K",
+
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Bean Hub"
+   },
+
+   KeySystem = true,
+   KeySettings = {
+      Title = "be4nk1dd GUI | Key System 🔑",
+      Subtitle = "To use the GUI, please enter the key",
+      Note = "https://sub2unlock.com/Hs9l3",
+      FileName = "BKey",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Team.GREENBEAN?!"}
+   }
+})
+
+-- ===== Notify =====
+Rayfield:Notify({
+   Title ="be4nk1dd Notification |",
+   Content = "Thank you for using this script!!",
+   Duration = 3,
+   Image = 94581578681529,
+})
+
+-- ===== Tabs & Sections =====
+local PlayerTab = Window:CreateTab("Player", 71823300997408)
+PlayerTab:CreateSection("Main")
+
+-- ===== Services =====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- ===== Variables =====
+local autoAimEnabled = false
+local aimRange = 100
+local walkSpeed = 16
+local espEnabled = false
+local targetNames = {"Zombie","Skeleton","Dummy"}
+local damage = 10
+local ESPBoxes = {}
+
+-- ===== AutoAim Toggle =====
+PlayerTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Flag = "AutoAimToggle",
+    Callback = function(Value)
+        autoAimEnabled = Value
+    end,
+})
+
+-- ===== Aim Range Slider =====
+PlayerTab:CreateSlider({
+    Name = "Aim Range",
+    Range = {100, 500},
+    Increment = 10,
+    Suffix = "Studs",
+    CurrentValue = 100,
+    Flag = "AimRangeSlider",
+    Callback = function(Value)
+        aimRange = Value
+    end,
+})
+
+-- ===== WalkSpeed Slider =====
+PlayerTab:CreateSlider({
+    Name = "Walkspeed",
+    Range = {0, 200},
+    Increment = 10,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "WalkSpeedSlider",
+    Callback = function(Value)
+        walkSpeed = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = walkSpeed
+        end
+    end,
+})
+
+-- ===== ESP Toggle =====
+PlayerTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(Value)
+        espEnabled = Value
+    end,
+})
+
+-- ===== WalkSpeed Respawn Fix =====
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+    hum.WalkSpeed = walkSpeed
+end)
+
+-- ===== AutoAim + AutoShoot Loop =====
+RunService.RenderStepped:Connect(function()
+    if not autoAimEnabled then return end
+    if not LocalPlayer.Character then return end
+    local head = LocalPlayer.Character:FindFirstChild("Head")
+    if not head then return end
+
+    local nearest, shortestDist = nil, aimRange
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Head") and obj:FindFirstChildOfClass("Humanoid") then
+            for _, name in ipairs(targetNames) do
+                if string.lower(obj.Name) == string.lower(name) then
+                    local dist = (obj.Head.Position - head.Position).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        nearest = obj.Head
+                    end
+                end
+            end
+        end
+    end
+
+    if nearest then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, nearest.Position)
+        local hum = nearest.Parent:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health > 0 then
+            hum:TakeDamage(damage)
+        end
+    end
+end)
+
+-- ===== ESP Loop (Entity Outline) =====
+RunService.RenderStepped:Connect(function()
+    -- Clear old boxes
+    for box, _ in pairs(ESPBoxes) do
+        if box and box.Parent then box:Destroy() end
+    end
+    ESPBoxes = {}
+
+    if not espEnabled then return end
+
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Head") and obj:FindFirstChildOfClass("Humanoid") then
+            for _, name in ipairs(targetNames) do
+                if string.lower(obj.Name) == string.lower(name) then
+                    local head = obj.Head
+                    local box = Instance.new("BoxHandleAdornment")
+                    box.Adornee = head
+                    box.Size = Vector3.new(2, 3, 2)
+                    box.Color3 = Color3.fromRGB(255, 0, 0)
+                    box.Transparency = 1 -- fully transparent inside
+                    box.LineThickness = 0.1 -- outline thickness
+                    box.AlwaysOnTop = true
+                    box.ZIndex = 10
+                    box.Parent = head
+                    ESPBoxes[box] = true
+                end
+            end
+        end
+    end
+end)
