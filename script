@@ -1,3 +1,7 @@
+==================================================
+Version: V1.2
+Description: Admin Panel with Rayfield GUI (aimbot, ESP, walkspeed, fly system for allowed UserIds).
+
 -- ===== Load Rayfield =====
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
@@ -8,7 +12,7 @@ local Window = Rayfield:CreateWindow({
     LoadingTitle = "Loading",
     LoadingSubtitle = "by be4nk1dd",
     ShowText = "Rayfield",
-    Theme = "Default",
+    Theme = "Green",
     ToggleUIKeybind = "K",
     ConfigurationSaving = {Enabled = true, FolderName = nil, FileName = "Bean Hub"},
     KeySystem = true,
@@ -25,10 +29,10 @@ local Window = Rayfield:CreateWindow({
 
 -- ===== Tabs =====
 local HomeTab = Window:CreateTab("Home", 82810016646886)
-HomeTab:CreateSection("Main")  -- Section name "Main"
+HomeTab:CreateSection("Main")
 
 local PlayerTab = Window:CreateTab("Player", 71823300997408)
-PlayerTab:CreateSection("Main") -- All toggles/sliders go here
+PlayerTab:CreateSection("Main")
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -41,15 +45,12 @@ local Camera = Workspace.CurrentCamera
 -- ===== Variables =====
 local autoAimEnabled = false
 local aimRange = 100
-local shootRange = 100
 local walkSpeed = 16
 local espEnabled = false
 local targetNames = {"Zombie","Skeleton","Dummy"}
-local damage = 10
 local ESPBoxes = {}
 
 -- ===== PlayerTab Controls =====
--- AutoAim Toggle
 PlayerTab:CreateToggle({
     Name = "Aimbot",
     CurrentValue = false,
@@ -59,7 +60,6 @@ PlayerTab:CreateToggle({
     end,
 })
 
--- AimRange Slider
 PlayerTab:CreateSlider({
     Name = "Aim Range",
     Range = {100, 500},
@@ -69,11 +69,9 @@ PlayerTab:CreateSlider({
     Flag = "AimRangeSlider",
     Callback = function(Value)
         aimRange = Value
-        shootRange = Value
     end,
 })
 
--- WalkSpeed Slider
 PlayerTab:CreateSlider({
     Name = "Walkspeed",
     Range = {0, 200},
@@ -89,7 +87,6 @@ PlayerTab:CreateSlider({
     end,
 })
 
--- ESP Toggle
 PlayerTab:CreateToggle({
     Name = "ESP",
     CurrentValue = false,
@@ -105,36 +102,54 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     hum.WalkSpeed = walkSpeed
 end)
 
--- ===== Function: Find nearest target =====
-local function findNearestTarget(originPos)
-    local nearest = nil
-    local shortestDist = aimRange
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj:IsA("Model") and obj:FindFirstChild("Head") and obj:FindFirstChildOfClass("Humanoid") then
-            for _, name in ipairs(targetNames) do
-                if string.lower(obj.Name) == string.lower(name) then
-                    local head = obj.Head
-                    local dist = (head.Position - originPos).Magnitude
-                    if dist < shortestDist then
-                        shortestDist = dist
-                        nearest = head
-                    end
-                end
-            end
+-- ===== Fly Variables =====
+local flying = false
+local flySpeed = 50
+local flyControl = {F=0,B=0,L=0,R=0}
+
+-- ===== Admin List =====
+local admins = {
+    [123456789] = true, -- replace with your UserId
+}
+
+-- ===== Fly Function =====
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = char.HumanoidRootPart
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(4000,4000,4000)
+    bv.Velocity = Vector3.zero
+    bv.Parent = hrp
+
+    RunService.RenderStepped:Connect(function()
+        if flying then
+            local camCF = Workspace.CurrentCamera.CFrame
+            local moveVec = Vector3.new()
+            if flyControl.F == 1 then moveVec = moveVec + camCF.LookVector end
+            if flyControl.B == 1 then moveVec = moveVec - camCF.LookVector end
+            if flyControl.L == 1 then moveVec = moveVec - camCF.RightVector end
+            if flyControl.R == 1 then moveVec = moveVec + camCF.RightVector end
+            bv.Velocity = moveVec * flySpeed
+        else
+            bv.Velocity = Vector3.zero
         end
-    end
-    return nearest, shortestDist
+    end)
 end
 
--- ===== AutoAim + AutoShoot Loop =====
-RunService.RenderStepped:Connect(function()
-    if not autoAimEnabled then return end
-    if not LocalPlayer.Character then return end
-
-    local head = LocalPlayer.Character:FindFirstChild("Head")
-    if not head then return end
-
-    local nearest, shortestDist = findNearestTarget(head.Position)
-
-    if nearest then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position,
+-- ===== Fly GUI Toggle =====
+if admins[LocalPlayer.UserId] then
+    PlayerTab:CreateToggle({
+        Name = "Fly",
+        CurrentValue = false,
+        Flag = "FlyToggle",
+        Callback = function(Value)
+            flying = Value
+            if flying then
+                startFly()
+            end
+        end,
+    })
+end
+==================================================
