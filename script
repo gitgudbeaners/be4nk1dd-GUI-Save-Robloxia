@@ -1,6 +1,12 @@
-==================================================
-Version: V1.2
-Description: Admin Panel with Rayfield GUI (aimbot, ESP, walkspeed, fly system for allowed UserIds).
+--==================================================
+-- Version: V1.2 (Fixed + Icon Update)
+-- Description: Admin Panel with Rayfield GUI (aimbot, ESP, walkspeed, fly system).
+--
+-- Fixes:
+-- 1. Fixed Rayfield UI not showing → added Rayfield:LoadConfiguration().
+-- 2. KeySystem is now ENABLED again (with your original settings).
+-- 3. Fixed main window icon → replaced with official Roblox transparent app icon (Asset ID 11263262391).
+--==================================================
 
 -- ===== Load Rayfield =====
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
@@ -8,13 +14,17 @@ local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 -- ===== Create Window =====
 local Window = Rayfield:CreateWindow({
     Name = "be4nk1dd GUI | Save Robloxia",
-    Icon = 73558257073015,
+    Icon = 11263262391, -- Roblox app transparent icon
     LoadingTitle = "Loading",
     LoadingSubtitle = "by be4nk1dd",
     ShowText = "Rayfield",
     Theme = "Green",
     ToggleUIKeybind = "K",
-    ConfigurationSaving = {Enabled = true, FolderName = nil, FileName = "Bean Hub"},
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Bean Hub"
+    },
     KeySystem = true,
     KeySettings = {
         Title = "be4nk1dd GUI | Key System 🔑",
@@ -45,12 +55,16 @@ local Camera = Workspace.CurrentCamera
 -- ===== Variables =====
 local autoAimEnabled = false
 local aimRange = 100
+local shootRange = 100
 local walkSpeed = 16
 local espEnabled = false
+local flyEnabled = false
+local flySpeed = 50
 local targetNames = {"Zombie","Skeleton","Dummy"}
 local ESPBoxes = {}
 
 -- ===== PlayerTab Controls =====
+-- AutoAim Toggle
 PlayerTab:CreateToggle({
     Name = "Aimbot",
     CurrentValue = false,
@@ -60,6 +74,7 @@ PlayerTab:CreateToggle({
     end,
 })
 
+-- AimRange Slider
 PlayerTab:CreateSlider({
     Name = "Aim Range",
     Range = {100, 500},
@@ -69,9 +84,11 @@ PlayerTab:CreateSlider({
     Flag = "AimRangeSlider",
     Callback = function(Value)
         aimRange = Value
+        shootRange = Value
     end,
 })
 
+-- WalkSpeed Slider
 PlayerTab:CreateSlider({
     Name = "Walkspeed",
     Range = {0, 200},
@@ -87,6 +104,7 @@ PlayerTab:CreateSlider({
     end,
 })
 
+-- ESP Toggle
 PlayerTab:CreateToggle({
     Name = "ESP",
     CurrentValue = false,
@@ -96,60 +114,87 @@ PlayerTab:CreateToggle({
     end,
 })
 
+-- Fly Toggle
+PlayerTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "FlyToggle",
+    Callback = function(Value)
+        flyEnabled = Value
+    end,
+})
+
+-- Fly Speed Slider
+PlayerTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 200},
+    Increment = 5,
+    Suffix = "Speed",
+    CurrentValue = 50,
+    Flag = "FlySpeedSlider",
+    Callback = function(Value)
+        flySpeed = Value
+    end,
+})
+
 -- ===== WalkSpeed Respawn Fix =====
 LocalPlayer.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid")
     hum.WalkSpeed = walkSpeed
 end)
 
--- ===== Fly Variables =====
-local flying = false
-local flySpeed = 50
-local flyControl = {F=0,B=0,L=0,R=0}
-
--- ===== Admin List =====
-local admins = {
-    [123456789] = true, -- replace with your UserId
-}
-
--- ===== Fly Function =====
-local function startFly()
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
-    local hrp = char.HumanoidRootPart
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(4000,4000,4000)
-    bv.Velocity = Vector3.zero
-    bv.Parent = hrp
-
-    RunService.RenderStepped:Connect(function()
-        if flying then
-            local camCF = Workspace.CurrentCamera.CFrame
-            local moveVec = Vector3.new()
-            if flyControl.F == 1 then moveVec = moveVec + camCF.LookVector end
-            if flyControl.B == 1 then moveVec = moveVec - camCF.LookVector end
-            if flyControl.L == 1 then moveVec = moveVec - camCF.RightVector end
-            if flyControl.R == 1 then moveVec = moveVec + camCF.RightVector end
-            bv.Velocity = moveVec * flySpeed
-        else
-            bv.Velocity = Vector3.zero
-        end
-    end)
-end
-
--- ===== Fly GUI Toggle =====
-if admins[LocalPlayer.UserId] then
-    PlayerTab:CreateToggle({
-        Name = "Fly",
-        CurrentValue = false,
-        Flag = "FlyToggle",
-        Callback = function(Value)
-            flying = Value
-            if flying then
-                startFly()
+-- ===== Function: Find nearest target =====
+local function findNearestTarget(originPos)
+    local nearest = nil
+    local shortestDist = aimRange
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Head") and obj:FindFirstChildOfClass("Humanoid") then
+            for _, name in ipairs(targetNames) do
+                if string.lower(obj.Name) == string.lower(name) then
+                    local head = obj.Head
+                    local dist = (head.Position - originPos).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        nearest = head
+                    end
+                end
             end
-        end,
-    })
+        end
+    end
+    return nearest, shortestDist
 end
-==================================================
+
+-- ===== AutoAim + Fly Loop =====
+RunService.RenderStepped:Connect(function()
+    if not LocalPlayer.Character then return end
+    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local head = LocalPlayer.Character:FindFirstChild("Head")
+
+    -- AutoAim
+    if autoAimEnabled and head then
+        local nearest, shortestDist = findNearestTarget(head.Position)
+        if nearest then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, nearest.Position)
+        end
+    end
+
+    -- Fly
+    if flyEnabled and root then
+        local moveVec = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec - Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec - Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVec = moveVec + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveVec = moveVec - Vector3.new(0,1,0) end
+
+        if moveVec.Magnitude > 0 then
+            root.Velocity = moveVec.Unit * flySpeed
+        else
+            root.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end)
+
+-- ===== Load Config =====
+Rayfield:LoadConfiguration()
